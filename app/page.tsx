@@ -13,7 +13,7 @@ export default function Home() {
         if (cameraOpen) {
             async function initCamera() {
                 try {
-                    const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    const mediaStream = await navigator.mediaDevices.getUserMedia({video: true});
                     if (videoRef.current) {
                         videoRef.current.srcObject = mediaStream;
                     }
@@ -22,6 +22,7 @@ export default function Home() {
                     console.error("Erreur accès caméra:", err);
                 }
             }
+
             initCamera();
         } else {
             if (stream) {
@@ -33,58 +34,85 @@ export default function Home() {
 
     const takePhoto = () => {
         if (!videoRef.current || !canvasRef.current) return;
-        const context = canvasRef.current.getContext("2d");
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        const context = canvas.getContext("2d");
         if (!context) return;
 
-        context.drawImage(videoRef.current, 0, 0, 320, 240);
-        setPhoto(canvasRef.current.toDataURL("image/png"));
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        setPhoto(canvas.toDataURL("image/png"));
         setCameraOpen(false);
     };
 
     return (
-        <div className="h-screen w-screen flex flex-col justify-end items-center overflow-hidden">
-            <canvas ref={canvasRef} width="320" height="240" style={{ display: "none" }} />
+        <div className="h-screen w-screen flex flex-col items-center justify-end">
+            <canvas ref={canvasRef} style={{display: "none"}}/>
 
-            {photo && (
-                <div className="mt-4">
-                    <img src={photo} alt="Captured" className="rounded-lg shadow-md" />
+            {!cameraOpen && photo && (
+                <div className="mb-8">
+                    <img src={photo} alt="Captured" className="max-h-80 w-full object-contain" />
+                    <button
+                        onClick={() => setPhoto(null)}
+                        className="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center absolute top-2 right-2 shadow-lg"
+                    >
+                        X
+                    </button>
                 </div>
             )}
+
             {cameraOpen ? (
-                <div className="flex flex-col items-center w-full h-full object-cover relative">
+                <div className="relative w-screen h-screen">
                     <video
                         ref={videoRef}
                         autoPlay
                         playsInline
-                        className="w-full h-full object-cover"
+                        className="absolute top-0 left-0 w-full h-full object-cover"
                     />
-                    <div className="flex gap-2 absolute bottom-0 mb-4">
+
+                    <div className="absolute bottom-8 w-full flex justify-center gap-8">
                         <button
                             onClick={takePhoto}
-                            className="p-3 bg-blue-600 text-white rounded-full"
+                            className="w-16 h-16 rounded-full bg-white flex items-center justify-center shadow-lg border-4 border-gray-300"
                         >
-                            📸 Prendre une photo
+                            📸
                         </button>
                         <button
                             onClick={() => setCameraOpen(false)}
-                            className="p-3 bg-red-600 text-white rounded-full"
+                            className="w-16 h-16 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg"
                         >
-                            ❌ Fermer
+                            X
                         </button>
                     </div>
                 </div>
             ) : (
-                <div className="flex gap-2 items-center my-4">
+                <div className="flex items-center gap-4 mb-8">
                     <button
-                        onClick={!photo ? () => setCameraOpen(true) : () => { setPhoto(null); setCameraOpen(true)}}
-                        className="p-3 bg-purple-600 text-4xl text-white rounded-full"
+                        onClick={!photo ? () => setCameraOpen(true) : () => {
+                            setPhoto(null);
+                            setCameraOpen(true);
+                        }}
+                        className="w-10 h-10 rounded-full bg-purple-600 text-white text-4xl shadow-lg"
                     >
                         +
                     </button>
-                    <input type="text" className="border px-2 py-1 rounded" />
-                    <button type="submit" className="p-2 bg-green-600 text-white rounded">
-                        Envoyer
-                    </button>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            placeholder="Ton message..."
+                            className="border rounded px-3 py-2 w-96 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                        />
+                        <button
+                            type="submit"
+                            className="px-4 py-2 bg-purple-600 text-white rounded-lg shadow"
+                        >
+                            Envoyer
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
