@@ -42,18 +42,23 @@ export default function Home() {
     };
 
     return (
-        <div className="h-screen w-screen flex flex-col justify-end items-center">
-            {cameraOpen && (
-                <div className="flex flex-col items-center">
+        <div className="h-screen w-screen flex flex-col justify-end items-center overflow-hidden">
+            <canvas ref={canvasRef} width="320" height="240" style={{ display: "none" }} />
+
+            {photo && (
+                <div className="mt-4">
+                    <img src={photo} alt="Captured" className="rounded-lg shadow-md" />
+                </div>
+            )}
+            {cameraOpen ? (
+                <div className="flex flex-col items-center w-full h-full object-cover relative">
                     <video
                         ref={videoRef}
                         autoPlay
                         playsInline
-                        width="320"
-                        height="240"
-                        className="rounded-lg shadow-md"
+                        className="w-full h-full object-cover"
                     />
-                    <div className="flex gap-2 mt-2">
+                    <div className="flex gap-2 absolute bottom-0 mb-4">
                         <button
                             onClick={takePhoto}
                             className="p-3 bg-blue-600 text-white rounded-full"
@@ -68,28 +73,20 @@ export default function Home() {
                         </button>
                     </div>
                 </div>
-            )}
-
-            <canvas ref={canvasRef} width="320" height="240" style={{ display: "none" }} />
-
-            {photo && (
-                <div className="mt-4">
-                    <img src={photo} alt="Captured" className="rounded-lg shadow-md" />
+            ) : (
+                <div className="flex gap-2 items-center my-4">
+                    <button
+                        onClick={!photo ? () => setCameraOpen(true) : () => { setPhoto(null); setCameraOpen(true)}}
+                        className="p-3 bg-purple-600 text-4xl text-white rounded-full"
+                    >
+                        +
+                    </button>
+                    <input type="text" className="border px-2 py-1 rounded" />
+                    <button type="submit" className="p-2 bg-green-600 text-white rounded">
+                        Envoyer
+                    </button>
                 </div>
             )}
-
-            <div className="flex gap-2 items-center mt-4">
-                <button
-                    onClick={!photo ? () => setCameraOpen(true) : () => {    setPhoto(null); setCameraOpen(true)}}
-                    className="p-3 bg-purple-600 text-4xl text-white rounded-full"
-                >
-                    +
-                </button>
-                <input type="text" className="border px-2 py-1 rounded" />
-                <button type="submit" className="p-2 bg-green-600 text-white rounded">
-                    Envoyer
-                </button>
-            </div>
         </div>
     );
 }
