@@ -45,12 +45,19 @@ export default function Chat() {
 
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        setPhoto(canvas.toDataURL("image/png"));
+        const newPhoto = canvas.toDataURL("image/png");
+        setPhoto(newPhoto);
         setCameraOpen(false);
+
+        const storedPhotos = JSON.parse(localStorage.getItem("photos") || "[]");
+        storedPhotos.push(newPhoto);
+        localStorage.setItem("photos", JSON.stringify(storedPhotos));
+
+        console.log("📸 Photo sauvegardée:", storedPhotos);
     };
 
     return (
-        <div className="h-full w-5/7 flex flex-col items-center justify-end p-4">
+        <div className="h-full w-5/7 flex flex-col items-center justify-end px-12 py-4">
             <canvas ref={canvasRef} style={{display: "none"}}/>
 
             {!cameraOpen && photo && (
@@ -90,27 +97,24 @@ export default function Chat() {
                     </div>
                 </div>
             ) : (
-                <div className="flex items-center gap-4 mb-8">
-                    <button
-                        onClick={!photo ? () => setCameraOpen(true) : () => {
-                            setPhoto(null);
-                            setCameraOpen(true);
-                        }}
-                        className="w-10 h-10 rounded-full bg-purple-600 text-white text-4xl shadow-lg"
-                    >
-                        +
-                    </button>
-                    <div className="flex gap-2">
+                <div className="w-full h-full flex flex-col">
+                    <div className="w-full h-full mb-4 overflow-y-auto">
+
+                    </div>
+                    <div className="w-full mb-4 relative">
                         <input
-                            type="text"
-                            placeholder="Ton message..."
-                            className="border rounded px-3 py-2 w-96 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                        type="text"
+                        placeholder="Message ..."
+                        className="border rounded-full pl-3 pr-20 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
                         />
                         <button
-                            type="submit"
-                            className="px-4 py-2 bg-purple-600 text-white rounded-lg shadow"
+                            onClick={!photo ? () => setCameraOpen(true) : () => {
+                                setPhoto(null);
+                                setCameraOpen(true);
+                            }}
+                            className="px-2 text-purple-600 text-4xl absolute top-1/2 transform -translate-y-1/2 right-4 cursor-pointer"
                         >
-                            Envoyer
+                            +
                         </button>
                     </div>
                 </div>
