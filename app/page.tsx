@@ -7,7 +7,7 @@ export default function Home() {
                 Go to Chat
             </Link>
             <Link href="/gallery" className="">
-                Go to Gallery
+                Go to Gallery store
             </Link>
         </div>
     );
