@@ -2,6 +2,13 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useSocket } from "@/contexts/SocketContext";
+import { useAuth } from "@/contexts/AuthContext";
+
+interface Message {
+    content: string;
+    pseudo: string | null;
+    dateEmis?: string | null;
+}
 
 export default function Chat() {
     const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -10,6 +17,8 @@ export default function Chat() {
     const [cameraOpen, setCameraOpen] = useState(false);
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [message, setMessage] = useState("");
+    const [messages, setMessages] = useState<Message[]>([]);
+    const { pseudo } = useAuth();
     const socket = useSocket();
 
     const sendMessage = () => {
@@ -17,6 +26,11 @@ export default function Chat() {
         socket.sendMessage(message);
         setMessage("");
     };
+
+    useEffect(() => {
+        setMessages([]);
+    }, [socket.joinRoom]);
+
 
     useEffect(() => {
         if (cameraOpen) {
@@ -40,6 +54,16 @@ export default function Chat() {
             }
         }
     }, [cameraOpen]);
+
+    useEffect(() => {
+        if (!socket) return;
+
+        socket.getMessages((data: Message) => {
+            if (data.pseudo === "SERVER") return;
+            setMessages((prev) => [...prev, data]);
+        });
+    }, [socket]);
+
 
     const takePhoto = () => {
         if (!videoRef.current || !canvasRef.current) return;
@@ -70,35 +94,77 @@ export default function Chat() {
             <canvas ref={canvasRef} style={{ display: "none" }} />
 
             {!cameraOpen && (
-                <div className="w-full h-full flex flex-col">
-                    <div className="w-full h-full mb-4 overflow-y-auto bg-gray-50 rounded-lg p-4 border">
-                        
-                    </div>
+                    <div className="w-full h-full flex flex-col">
+                        <div className="w-full h-[calc(100vh-150px)] mb-4 overflow-y-auto overflow-x-hidden px-8">
+                            {messages.length === 0 ? (
+                                <p className="h-full text-gray-500 flex justify-center items-center">
+                                    Commencez à discuter ! Envoyer le premier message.
+                                </p>
+                            ) : (
+                                messages.map((msg, index) => {
+                                    const date = new Date(msg.dateEmis ?? Date.now());
+                                    const now = new Date();
+                                    const isToday =
+                                        date.getDate() === now.getDate() &&
+                                        date.getMonth() === now.getMonth() &&
+                                        date.getFullYear() === now.getFullYear();
 
-                    <div className="w-full mb-4 relative flex items-center">
-                        <input
-                            type="text"
-                            value={message}
-                            onChange={(e) => setMessage(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-                            placeholder="Message ..."
-                            className="border rounded-full pl-3 pr-20 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
-                        />
-                        <button
-                            onClick={sendMessage}
-                            className="absolute right-16 text-purple-600 font-bold"
-                        >
-                            ➤
-                        </button>
-                        <button
-                            onClick={() => setCameraOpen(true)}
-                            className="px-2 text-purple-600 text-4xl absolute top-1/2 transform -translate-y-1/2 right-4 cursor-pointer"
-                        >
-                            +
-                        </button>
+                                    const pad = (n: number) => n.toString().padStart(2, "0");
+                                    const hours = pad(date.getHours());
+                                    const minutes = pad(date.getMinutes());
+                                    const formattedDate = isToday
+                                        ? `${hours}:${minutes}`
+                                        : `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} - ${hours}:${minutes}`;
+
+                                    return (msg.pseudo === pseudo) ? (
+                                        <div key={index} className="w-full flex justify-end items-center mb-2">
+                                            <div className="flex flex-col gap-1.5 bg-violet-600 text-white px-3 py-1 rounded-lg w-fit">
+                                                <p className="text-[12px]">
+                                                    {msg.pseudo}{" "}
+                                                    <span className="text-white text-[10px] italic">{formattedDate}</span>
+                                                </p>
+                                                <p>{msg.content}</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div key={index} className="w-full flex justify-start items-center mb-2">
+                                            <div className="flex flex-col gap-1.5 bg-gray-200 text-gray-800 px-3 py-1 rounded-lg w-fit">
+                                                <p className="text-[12px]">
+                                                    {msg.pseudo}{" "}
+                                                    <span className="text-gray-500 text-[10px] italic">{formattedDate}</span>
+                                                </p>
+                                                <p>{msg.content}</p>
+                                            </div>
+                                        </div>
+                                    )
+                                })
+                            )}
+                        </div>
+    
+                        <div className="w-full mb-4 relative flex items-center">
+                            <input
+                                type="text"
+                                value={message}
+                                onChange={(e) => setMessage(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+                                placeholder="Message ..."
+                                className="border rounded-full pl-3 pr-20 py-2 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                            />
+                            <button
+                                onClick={sendMessage}
+                                className="absolute right-16 text-purple-600 font-bold"
+                            >
+                                ➤
+                            </button>
+                            <button
+                                onClick={() => setCameraOpen(true)}
+                                className="px-2 text-purple-600 text-4xl absolute top-1/2 transform -translate-y-1/2 right-4 cursor-pointer"
+                            >
+                                +
+                            </button>
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
 
             {cameraOpen && (
                 <div className="absolute top-0 left-0 w-full h-full bg-white">

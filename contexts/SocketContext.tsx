@@ -8,6 +8,7 @@ interface SocketContextType {
     currentRoom: string | null;
     joinRoom: (roomName: string, pseudo: string | null) => void;
     sendMessage: (message: string, pseudo?: string | null) => void;
+    getMessages: (callback: (data: { content: string; pseudo: string | null, dateEmis: string | null }) => void) => void;
 }
 
 const SocketContext = createContext<SocketContextType | null>(null);
@@ -32,6 +33,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     const joinRoom = (roomName: string, pseudo: string | null) => {
         if (!socket) return;
 
+        if (currentRoom === roomName) return;
         socket.emit("chat-join-room", { pseudo, roomName });
         setCurrentRoom(roomName);
     };
@@ -47,8 +49,19 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
         });
     };
 
+    const getMessages = (callback: (data: { content: string; pseudo: string | null, dateEmis: string | null }) => void) => {
+        if (!socket) return;
+
+        socket.off("chat-msg");
+        socket.on("chat-msg", (data: { content: string; pseudo: string | null, dateEmis: string | null }) => {
+            callback(data);
+        });
+
+    };
+
+
     return (
-        <SocketContext.Provider value={{ socket, currentRoom, joinRoom, sendMessage }}>
+        <SocketContext.Provider value={{ socket, currentRoom, joinRoom, sendMessage, getMessages }}>
             {children}
         </SocketContext.Provider>
     );
