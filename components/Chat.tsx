@@ -13,6 +13,7 @@ interface Message {
 export default function Chat() {
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const [photo, setPhoto] = useState<string | null>(null);
     const [cameraOpen, setCameraOpen] = useState(false);
     const [stream, setStream] = useState<MediaStream | null>(null);
@@ -27,10 +28,18 @@ export default function Chat() {
         setMessage("");
     };
 
+    // Vide les messages quand on change de room
     useEffect(() => {
         setMessages([]);
-    }, [socket.joinRoom]);
+    }, [socket.currentRoom]);
 
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
 
     useEffect(() => {
         if (cameraOpen) {
@@ -64,7 +73,6 @@ export default function Chat() {
         });
     }, [socket]);
 
-
     const takePhoto = () => {
         if (!videoRef.current || !canvasRef.current) return;
         const video = videoRef.current;
@@ -90,57 +98,63 @@ export default function Chat() {
     };
 
     return (
-        <div className="h-full w-5/7 flex flex-col items-center justify-end px-12 py-4">
+        <div className="h-[calc(100vh-57px)] w-5/7 flex flex-col items-center justify-end px-12 py-4">
             <canvas ref={canvasRef} style={{ display: "none" }} />
 
             {!cameraOpen && (
-                    <div className="w-full h-full flex flex-col">
-                        <div className="w-full h-[calc(100vh-150px)] mb-4 overflow-y-auto overflow-x-hidden px-8">
-                            {messages.length === 0 ? (
-                                <p className="h-full text-gray-500 flex justify-center items-center">
-                                    Commencez à discuter ! Envoyer le premier message.
-                                </p>
-                            ) : (
-                                messages.map((msg, index) => {
-                                    const date = new Date(msg.dateEmis ?? Date.now());
-                                    const now = new Date();
-                                    const isToday =
-                                        date.getDate() === now.getDate() &&
-                                        date.getMonth() === now.getMonth() &&
-                                        date.getFullYear() === now.getFullYear();
+                <div className="w-full h-full flex flex-col">
+                    <div className="w-full h-[calc(100vh-150px)] mb-4 overflow-y-auto overflow-x-hidden px-8">
+                        {!socket?.currentRoom ? (
+                            <div className="text-center text-gray-500 h-full flex justify-center items-center">
+                                <p>Rejoignez une conversation pour commencer à discuter !</p>
+                            </div>
+                        ) : messages.length === 0 ? (
+                            <p className="h-full text-gray-500 flex justify-center items-center">
+                                Commencez à discuter ! Envoyez le premier message.
+                            </p>
+                        ) : (
+                            messages.map((msg, index) => {
+                                const date = new Date(msg.dateEmis ?? Date.now());
+                                const now = new Date();
+                                const isToday =
+                                    date.getDate() === now.getDate() &&
+                                    date.getMonth() === now.getMonth() &&
+                                    date.getFullYear() === now.getFullYear();
 
-                                    const pad = (n: number) => n.toString().padStart(2, "0");
-                                    const hours = pad(date.getHours());
-                                    const minutes = pad(date.getMinutes());
-                                    const formattedDate = isToday
-                                        ? `${hours}:${minutes}`
-                                        : `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} - ${hours}:${minutes}`;
+                                const pad = (n: number) => n.toString().padStart(2, "0");
+                                const hours = pad(date.getHours());
+                                const minutes = pad(date.getMinutes());
+                                const formattedDate = isToday
+                                    ? `${hours}:${minutes}`
+                                    : `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} - ${hours}:${minutes}`;
 
-                                    return (msg.pseudo === pseudo) ? (
-                                        <div key={index} className="w-full flex justify-end items-center mb-2">
-                                            <div className="flex flex-col gap-1.5 bg-violet-600 text-white px-3 py-1 rounded-lg w-fit">
-                                                <p className="text-[12px]">
-                                                    {msg.pseudo}{" "}
-                                                    <span className="text-white text-[10px] italic">{formattedDate}</span>
-                                                </p>
-                                                <p>{msg.content}</p>
-                                            </div>
+                                return msg.pseudo === pseudo ? (
+                                    <div key={index} className="w-full flex justify-end items-center mb-2">
+                                        <div className="flex flex-col gap-1.5 bg-violet-600 text-white px-3 py-1 rounded-lg w-fit">
+                                            <p className="text-[12px]">
+                                                {msg.pseudo}{" "}
+                                                <span className="text-white text-[10px] italic">{formattedDate}</span>
+                                            </p>
+                                            <p>{msg.content}</p>
                                         </div>
-                                    ) : (
-                                        <div key={index} className="w-full flex justify-start items-center mb-2">
-                                            <div className="flex flex-col gap-1.5 bg-gray-200 text-gray-800 px-3 py-1 rounded-lg w-fit">
-                                                <p className="text-[12px]">
-                                                    {msg.pseudo}{" "}
-                                                    <span className="text-gray-500 text-[10px] italic">{formattedDate}</span>
-                                                </p>
-                                                <p>{msg.content}</p>
-                                            </div>
+                                    </div>
+                                ) : (
+                                    <div key={index} className="w-full flex justify-start items-center mb-2">
+                                        <div className="flex flex-col gap-1.5 bg-gray-200 text-gray-800 px-3 py-1 rounded-lg w-fit">
+                                            <p className="text-[12px]">
+                                                {msg.pseudo}{" "}
+                                                <span className="text-gray-500 text-[10px] italic">{formattedDate}</span>
+                                            </p>
+                                            <p>{msg.content}</p>
                                         </div>
-                                    )
-                                })
-                            )}
-                        </div>
-    
+                                    </div>
+                                );
+                            })
+                        )}
+                        <div ref={messagesEndRef} />
+                    </div>
+
+                    {socket?.currentRoom && (
                         <div className="w-full mb-4 relative flex items-center">
                             <input
                                 type="text"
@@ -152,7 +166,7 @@ export default function Chat() {
                             />
                             <button
                                 onClick={sendMessage}
-                                className="absolute right-16 text-purple-600 font-bold"
+                                className="absolute right-16 text-purple-600 font-bold cursor-pointer"
                             >
                                 ➤
                             </button>
@@ -163,8 +177,9 @@ export default function Chat() {
                                 +
                             </button>
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
+            )}
 
             {cameraOpen && (
                 <div className="absolute top-0 left-0 w-full h-full bg-white">

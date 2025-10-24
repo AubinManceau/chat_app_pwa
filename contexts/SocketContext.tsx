@@ -34,6 +34,9 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
         if (!socket) return;
 
         if (currentRoom === roomName) return;
+        socket.off("chat-join-room");
+        setCurrentRoom(null);
+
         socket.emit("chat-join-room", { pseudo, roomName });
         setCurrentRoom(roomName);
     };

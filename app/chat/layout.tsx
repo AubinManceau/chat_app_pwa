@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { SocketProvider } from "@/contexts/SocketContext";
-import "./globals.css";
+import "../globals.css";
 import Header from "@/components/Header";
 import { AuthProvider } from "@/contexts/AuthContext";
 
@@ -15,8 +15,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className="h-screen overflow-hidden">
         <div className="flex flex-col h-full">
           <AuthProvider>
-            <Header />
-            {children}
+            <SocketProvider>
+              <Header />
+              {children}
+            </SocketProvider>
           </AuthProvider>
         </div>
       </body>
