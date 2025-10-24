@@ -11,10 +11,11 @@ export default function Home() {
     const handleLogin = () => {
         registerUser(pseudoInput);
         router.push("/chat");
+        setPseudoInput("");
     }
 
     return (
-        <div className="h-full w-full flex">
+        <div className="h-[calc(100vh-57px)] w-full flex">
             <div className="w-1/2 border-r border-gray-300 my-5">
                 
             </div>

@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode; }>) {
   return (
     <html lang="en">
-      <body className="h-screen overflow-hidden">
+      <body className="h-screen overflow-y-hidden">
         <div className="flex flex-col h-full">
           <AuthProvider>
             <Header />

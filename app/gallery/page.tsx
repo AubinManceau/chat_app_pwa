@@ -11,7 +11,7 @@ export default function Gallery() {
     }, []);
 
     return (
-        <div className="h-full w-full p-4">
+        <div className="h-[calc(100vh-57px)] w-full p-4">
             {photos.length === 0 ? (
                 <p className="h-full flex justify-center items-center">
                     Aucune photo enregistrée
