@@ -5,8 +5,6 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         const { id, image_data } = body;
 
-        console.log('📤 Envoi image - ID:', id, 'Taille data:', image_data?.length || 0);
-
         const response = await fetch('https://api.tools.gavago.fr/socketio/api/images/', {
             method: 'POST',
             headers: {
@@ -17,7 +15,7 @@ export async function POST(request: NextRequest) {
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('❌ Erreur API externe:', response.status, errorText);
+            console.error('API image upload error:', response.status, errorText);
             return NextResponse.json(
                 { error: `API error: ${response.status}`, details: errorText },
                 { status: response.status }
@@ -25,10 +23,9 @@ export async function POST(request: NextRequest) {
         }
 
         const data = await response.json();
-        console.log('✅ Image envoyée avec succès');
         return NextResponse.json(data);
     } catch (error) {
-        console.error('❌ Erreur dans POST /api/images:', error);
+        console.error('Image upload error:', error);
         return NextResponse.json(
             { error: 'Failed to upload image', details: (error as Error).message },
             { status: 500 }
@@ -48,8 +45,6 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        console.log('📥 Récupération image - ID:', id);
-
         const response = await fetch(`https://api.tools.gavago.fr/socketio/api/images/${id}`, {
             headers: {
                 'Content-Type': 'application/json',
@@ -59,7 +54,7 @@ export async function GET(request: NextRequest) {
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('❌ Erreur API externe:', response.status, errorText);
+            console.error('API image fetch error:', response.status, errorText);
             return NextResponse.json(
                 { error: `API error: ${response.status}`, details: errorText },
                 { status: response.status }
@@ -67,10 +62,9 @@ export async function GET(request: NextRequest) {
         }
 
         const data = await response.json();
-        console.log('✅ Image récupérée avec succès');
         return NextResponse.json(data);
     } catch (error) {
-        console.error('❌ Erreur dans GET /api/images:', error);
+        console.error('Image fetch error:', error);
         return NextResponse.json(
             { error: 'Failed to fetch image', details: (error as Error).message },
             { status: 500 }
