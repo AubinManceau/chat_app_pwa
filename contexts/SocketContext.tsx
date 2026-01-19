@@ -8,7 +8,8 @@ interface SocketContextType {
     currentRoom: string | null;
     joinRoom: (roomName: string, pseudo: string | null) => void;
     sendMessage: (message: string, pseudo?: string | null) => void;
-    getMessages: (callback: (data: { content: string; pseudo: string | null, dateEmis: string | null }) => void) => void;
+    sendImageMessage: (imageId: string, imageData: string) => void;
+    getMessages: (callback: (data: { content: string; pseudo: string | null, dateEmis: string | null, imageId?: string, imageData?: string }) => void) => void;
 }
 
 const SocketContext = createContext<SocketContextType | null>(null);
@@ -52,11 +53,26 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
         });
     };
 
-    const getMessages = (callback: (data: { content: string; pseudo: string | null, dateEmis: string | null }) => void) => {
+    const sendImageMessage = (imageId: string, imageData: string) => {
+        if (!socket || !currentRoom) {
+            return;
+        }
+
+        // Utiliser le même format que le serveur pour la compatibilité
+        const imageUrl = `https://api.tools.gavago.fr/socketio/tchat/api/images/${imageId}`;
+        const messageContent = `[IMAGE] ${imageUrl}`;
+
+        socket.emit("chat-msg", {
+            content: messageContent,
+            roomName: currentRoom,
+        });
+    };
+
+    const getMessages = (callback: (data: { content: string; pseudo: string | null, dateEmis: string | null, imageId?: string, imageData?: string }) => void) => {
         if (!socket) return;
 
         socket.off("chat-msg");
-        socket.on("chat-msg", (data: { content: string; pseudo: string | null, dateEmis: string | null }) => {
+        socket.on("chat-msg", (data: { content: string; pseudo: string | null, dateEmis: string | null, imageId?: string, imageData?: string }) => {
             callback(data);
         });
 
@@ -64,7 +80,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
 
     return (
-        <SocketContext.Provider value={{ socket, currentRoom, joinRoom, sendMessage, getMessages }}>
+        <SocketContext.Provider value={{ socket, currentRoom, joinRoom, sendMessage, sendImageMessage, getMessages }}>
             {children}
         </SocketContext.Provider>
     );
