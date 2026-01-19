@@ -1,6 +1,23 @@
 const API_BASE_URL = "https://api.tools.gavago.fr/socketio/api";
 
-export async function fetchData(endpoint: string) {
+export interface ApiResponse<T> {
+  success?: boolean;
+  data?: T;
+  error?: string;
+  [key: string]: any;
+}
+
+export interface ImageUploadResponse {
+  success: boolean;
+  message?: string;
+}
+
+export interface ImageGetResponse {
+  success: boolean;
+  data_image?: string;
+}
+
+export async function fetchData<T>(endpoint: string): Promise<ApiResponse<T>> {
   try {
     const headers = {
       "Content-Type": "application/json",
@@ -24,7 +41,7 @@ export async function fetchData(endpoint: string) {
   }
 }
 
-export async function sendImage(socketId: string, imageData: string) {
+export async function sendImage(socketId: string, imageData: string): Promise<ApiResponse<ImageUploadResponse>> {
   try {
     const headers = {
       "Content-Type": "application/json",
@@ -53,7 +70,7 @@ export async function sendImage(socketId: string, imageData: string) {
   }
 }
 
-export async function getImage(imageId: string) {
+export async function getImage(imageId: string): Promise<ApiResponse<ImageGetResponse>> {
   try {
     const headers = {
       "Content-Type": "application/json",

@@ -1,6 +1,8 @@
 export interface Message {
     content: string;
     pseudo: string | null;
+    userId?: string;
+    categorie?: 'MESSAGE' | 'INFO' | 'NEW_IMAGE';
     dateEmis?: string | null;
     imageId?: string;
     imageData?: string;

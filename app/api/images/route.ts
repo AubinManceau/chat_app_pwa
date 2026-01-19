@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+interface ImagePostBody {
+    id: string;
+    image_data: string;
+}
+
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json();
+        const body: ImagePostBody = await request.json();
         const { id, image_data } = body;
 
         const response = await fetch('https://api.tools.gavago.fr/socketio/api/images/', {

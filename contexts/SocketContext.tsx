@@ -2,14 +2,15 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
+import { Message } from "@/types/chat";
 
 interface SocketContextType {
     socket: Socket | null;
     currentRoom: string | null;
     joinRoom: (roomName: string, pseudo: string | null) => void;
     sendMessage: (message: string, pseudo?: string | null) => void;
-    sendImageMessage: (imageId: string, imageData: string) => void;
-    getMessages: (callback: (data: { content: string; pseudo: string | null, dateEmis: string | null, imageId?: string, imageData?: string }) => void) => void;
+    sendImageMessage: (imageData: string) => void;
+    getMessages: (callback: (data: Message) => void) => void;
 }
 
 const SocketContext = createContext<SocketContextType | null>(null);
@@ -53,26 +54,22 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
         });
     };
 
-    const sendImageMessage = (imageId: string, imageData: string) => {
+    const sendImageMessage = (imageData: string) => {
         if (!socket || !currentRoom) {
             return;
         }
 
-        // Utiliser le même format que le serveur pour la compatibilité
-        const imageUrl = `https://api.tools.gavago.fr/socketio/tchat/api/images/${imageId}`;
-        const messageContent = `[IMAGE] ${imageUrl}`;
-
         socket.emit("chat-msg", {
-            content: messageContent,
+            content: imageData,
             roomName: currentRoom,
         });
     };
 
-    const getMessages = (callback: (data: { content: string; pseudo: string | null, dateEmis: string | null, imageId?: string, imageData?: string }) => void) => {
+    const getMessages = (callback: (data: Message) => void) => {
         if (!socket) return;
 
         socket.off("chat-msg");
-        socket.on("chat-msg", (data: { content: string; pseudo: string | null, dateEmis: string | null, imageId?: string, imageData?: string }) => {
+        socket.on("chat-msg", (data: Message) => {
             callback(data);
         });
 

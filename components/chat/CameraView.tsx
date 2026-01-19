@@ -9,9 +9,20 @@ export default function CameraView({ onPhotoTaken, onClose }: CameraViewProps) {
     const [stream, setStream] = useState<MediaStream | null>(null);
 
     useEffect(() => {
+        let isMounted = true;
+        let localStream: MediaStream | null = null;
+
         async function initCamera() {
             try {
                 const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+
+                // Si le composant a été démonté entre temps, on coupe tout de suite
+                if (!isMounted) {
+                    mediaStream.getTracks().forEach(track => track.stop());
+                    return;
+                }
+
+                localStream = mediaStream;
                 if (videoRef.current) {
                     videoRef.current.srcObject = mediaStream;
                 }
@@ -24,11 +35,17 @@ export default function CameraView({ onPhotoTaken, onClose }: CameraViewProps) {
         initCamera();
 
         return () => {
+            isMounted = false;
+            // Nettoyage principal lors du démontage
+            if (localStream) {
+                localStream.getTracks().forEach((track) => track.stop());
+            }
+            // Sécurité : Vérifier si le state stream contient quelque chose
             if (stream) {
                 stream.getTracks().forEach((track) => track.stop());
             }
         };
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const takePhoto = () => {
         if (!videoRef.current || !canvasRef.current) return;
@@ -40,6 +57,10 @@ export default function CameraView({ onPhotoTaken, onClose }: CameraViewProps) {
 
         const context = canvas.getContext("2d");
         if (!context) return;
+
+        // Appliquer l'effet miroir à la capture
+        context.translate(canvas.width, 0);
+        context.scale(-1, 1);
 
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
@@ -67,7 +88,7 @@ export default function CameraView({ onPhotoTaken, onClose }: CameraViewProps) {
                 ref={videoRef}
                 autoPlay
                 playsInline
-                className="absolute top-0 left-0 w-full h-full object-cover"
+                className="absolute top-0 left-0 w-full h-full object-cover scale-x-[-1]"
             />
 
             <div className="absolute bottom-8 w-full flex justify-center gap-8">

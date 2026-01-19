@@ -7,7 +7,7 @@ export default function ImageViewer({ imageData, onClose }: ImageViewerProps) {
 
     return (
         <div
-            className="fixed inset-0 flex items-center justify-center z-50"
+            className="bg-black/70 fixed inset-0 flex items-center justify-center z-50"
             onClick={onClose}
         >
             <div className="relative max-w-4xl max-h-[90vh] p-4">
