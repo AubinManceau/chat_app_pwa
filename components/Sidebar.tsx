@@ -89,7 +89,14 @@ export default function Sidebar() {
                     </div>
                     <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white px-6 py-4 rounded-lg flex flex-col items-start gap-4">
                         <h2 className="text-xl font-semibold">Créer une nouvelle conversation</h2>
-                        <input type="text" className="w-full border-1 border-black p-1 rounded-md" value={newRoomName} onChange={(e) => setNewRoomName(e.target.value)} placeholder="Nom de la conversation" />
+                        <input
+                            type="text"
+                            className="w-full border-1 border-black p-1 rounded-md"
+                            value={newRoomName}
+                            onChange={(e) => setNewRoomName(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleCreateRoom()}
+                            placeholder="Nom de la conversation"
+                        />
                         <button onClick={handleCreateRoom} className="bg-violet-600 px-4 py-1 cursor-pointer rounded-md text-white">Créer</button>
                     </div>
                 </div>

@@ -17,7 +17,7 @@ export default function Home() {
     return (
         <div className="h-[calc(100vh-57px)] w-full flex">
             <div className="w-1/2 border-r border-gray-300 my-5">
-                
+
             </div>
             <div className="w-1/2 flex flex-col justify-center items-center gap-4">
                 {pseudo ? (
@@ -29,6 +29,7 @@ export default function Home() {
                             value={pseudoInput}
                             placeholder="Entrez votre pseudo"
                             onChange={(e) => setPseudoInput(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
                             className="border p-2 rounded w-full"
                         />
                         <button
