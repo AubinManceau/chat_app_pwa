@@ -6,8 +6,6 @@ export interface Message {
     dateEmis?: string | null;
     imageId?: string;
     imageData?: string;
-    pending?: boolean;
-    tempId?: string;
 }
 
 export interface CameraViewProps {

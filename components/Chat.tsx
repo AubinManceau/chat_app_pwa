@@ -11,14 +11,6 @@ import CameraView from "@/components/chat/CameraView";
 import GalleryModal from "@/components/chat/GalleryModal";
 import ImageViewer from "@/components/chat/ImageViewer";
 
-interface OfflineQueueItem {
-    content: string;
-    roomName: string;
-    timestamp: number;
-    tempId: string;
-    dateEmis?: string; // optionnel car ajouté lors du mapping
-}
-
 export default function Chat() {
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const [photo, setPhoto] = useState<string | null>(null);
@@ -38,23 +30,6 @@ export default function Chat() {
 
     useEffect(() => {
         setMessages([]);
-        // Charger les messages en attente depuis localStorage
-        const queue = JSON.parse(localStorage.getItem("offline_queue") || "[]");
-        // Filtrer par room pour ne pas afficher les messages d'autres conversations
-        const pendingMessages: Message[] = queue
-            .filter((msg: OfflineQueueItem) => msg.roomName === socket.currentRoom)
-            .map((msg: OfflineQueueItem) => ({
-                content: msg.content,
-                pseudo: null,
-                pending: true,
-                tempId: msg.tempId,
-                imageData: msg.content.startsWith('data:image/') ? msg.content : undefined,
-                dateEmis: new Date(msg.timestamp || Date.now()).toISOString()
-            }));
-
-        if (pendingMessages.length > 0) {
-            setMessages(pendingMessages);
-        }
     }, [socket.currentRoom]);
 
     const scrollToBottom = () => {
@@ -76,25 +51,14 @@ export default function Chat() {
                 data.imageData = data.content;
             }
 
-            // Priorité 1 : Format JSON avec données embarquées (Rapide, synchrone)
-            try {
-                const parsed = JSON.parse(data.content);
-                if (parsed.type === 'image' && parsed.imageData) {
-                    data.imageData = parsed.imageData;
-                    data.imageId = parsed.imageId;
-                }
-            } catch (e) {
-                // Pas du JSON, continuer
-            }
 
-            // Priorité 2 : Format IMAGE:base64 (Données directes)
-            if (!data.imageData && data.content.startsWith('IMAGE:data:image/')) {
-                data.imageData = data.content.substring(6); // Enlever "IMAGE:"
-            }
-
-            // Priorité 3 : Format URL (Extraction ID synchrone)
-            // On n'attend plus le chargement de l'image ici pour ne pas bloquer l'ordre des messages
-            if (!data.imageData && data.content.startsWith('[IMAGE]')) {
+            // Si c'est une image, on extrait l'ID
+            if (data.imageData) {
+                // Pour les messages entrants, on n'a pas forcément l'ID de l'image
+                // Il faudrait que le back renvoie l'ID s'il est stocké
+                // Pour l'instant on suppose que le content contient l'URL si c'est un message système
+            } else if (data.content && data.content.includes('/images/')) {
+                // Tentative d'extraction d'ID depuis l'URL si présent dans le content
                 const urlMatch = data.content.match(/https?:\/\/[^\s]+\/images\/([^\s]+)/);
                 if (urlMatch && urlMatch[1]) {
                     data.imageId = urlMatch[1];
@@ -102,22 +66,6 @@ export default function Chat() {
             }
 
             setMessages((prev) => [...prev, data]);
-        });
-    }, [socket]);
-
-    // Enregistrer les callbacks pour les messages en attente
-    useEffect(() => {
-        if (!socket.setPendingMessageCallback || !socket.setMessageSentCallback) return;
-
-        // Callback pour ajouter un message en attente
-        socket.setPendingMessageCallback((message: Message) => {
-            // Vérifier si le message en attente est bien pour la room courante
-            setMessages((prev) => [...prev, message]);
-        });
-
-        // Callback pour retirer un message une fois envoyé
-        socket.setMessageSentCallback((tempId: string) => {
-            setMessages((prev) => prev.filter(msg => msg.tempId !== tempId));
         });
     }, [socket]);
 
@@ -181,7 +129,7 @@ export default function Chat() {
                             <MessageBubble
                                 key={index}
                                 message={msg}
-                                isOwnMessage={msg.pseudo === pseudo || msg.pending === true}
+                                isOwnMessage={msg.pseudo === pseudo}
                                 onImageClick={setSelectedImage}
                             />
                         ))}

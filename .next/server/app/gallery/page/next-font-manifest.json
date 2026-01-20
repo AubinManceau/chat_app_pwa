@@ -1,0 +1,8 @@
+{
+  "pages": {},
+  "app": {
+    "[project]/chat_app_pwa/app/gallery/page": []
+  },
+  "appUsingSizeAdjust": false,
+  "pagesUsingSizeAdjust": false
+}
