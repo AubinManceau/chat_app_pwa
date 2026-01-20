@@ -30,6 +30,23 @@ export default function Chat() {
 
     useEffect(() => {
         setMessages([]);
+        // Charger les messages en attente depuis localStorage
+        const queue = JSON.parse(localStorage.getItem("offline_queue") || "[]");
+        // Filtrer par room pour ne pas afficher les messages d'autres conversations
+        const pendingMessages: Message[] = queue
+            .filter((msg: any) => msg.roomName === socket.currentRoom)
+            .map((msg: any) => ({
+                content: msg.content,
+                pseudo: null,
+                pending: true,
+                tempId: msg.tempId,
+                imageData: msg.content.startsWith('data:image/') ? msg.content : undefined,
+                dateEmis: new Date(msg.timestamp).toISOString()
+            }));
+
+        if (pendingMessages.length > 0) {
+            setMessages(pendingMessages);
+        }
     }, [socket.currentRoom]);
 
     const scrollToBottom = () => {
@@ -79,6 +96,9 @@ export default function Chat() {
             setMessages((prev) => [...prev, data]);
         });
     }, [socket]);
+
+    // Enregistrer les callbacks pour les messages en attente
+
 
     const sendPhoto = async () => {
         if (!photo || !socket.socket?.id) return;
@@ -139,7 +159,7 @@ export default function Chat() {
                             <MessageBubble
                                 key={index}
                                 message={msg}
-                                isOwnMessage={msg.pseudo === pseudo}
+                                isOwnMessage={msg.pseudo === pseudo || msg.pending === true}
                                 onImageClick={setSelectedImage}
                             />
                         ))}

@@ -48,10 +48,19 @@ export default function MessageBubble({ message, isOwnMessage, onImageClick }: M
 
     return (
         <div className={`w-full flex ${isOwnMessage ? 'justify-end' : 'justify-start'} items-center mb-2`}>
-            <div className={`flex flex-col gap-1.5 px-3 py-1 rounded-lg w-fit max-w-[70%] ${isOwnMessage ? 'bg-violet-600 text-white' : 'bg-gray-200 text-gray-800'
+            <div className={`flex flex-col gap-1.5 px-3 py-1 rounded-lg w-fit max-w-[70%] ${message.pending
+                    ? (isOwnMessage ? 'bg-violet-300 text-white opacity-70 border-2 border-dashed border-violet-400' : 'bg-gray-300 text-gray-700 opacity-70 border-2 border-dashed border-gray-400')
+                    : (isOwnMessage ? 'bg-violet-600 text-white' : 'bg-gray-200 text-gray-800')
                 }`}>
                 <p className="text-[12px] break-words">
-                    {message.pseudo || message.userId || 'Anonyme'}{" "}
+                    {message.pending ? (
+                        <span className="flex items-center gap-1">
+                            <span>🔄</span>
+                            <span>En attente d'envoi</span>
+                        </span>
+                    ) : (
+                        <>{message.pseudo || message.userId || "Anonyme"}</>
+                    )}{" "}
                     <span className={`text-[10px] italic ${isOwnMessage ? 'text-white' : 'text-gray-500'
                         }`}>{formattedDate}</span>
                 </p>
