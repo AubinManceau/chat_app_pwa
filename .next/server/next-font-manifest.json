@@ -1,9 +1,5 @@
 {
-  "app": {
-    "[project]/chat_app_pwa/app/chat/page": [],
-    "[project]/chat_app_pwa/app/gallery/page": [],
-    "[project]/chat_app_pwa/app/page": []
-  },
+  "app": {},
   "appUsingSizeAdjust": false,
   "pages": {},
   "pagesUsingSizeAdjust": false
