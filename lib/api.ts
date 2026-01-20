@@ -4,7 +4,7 @@ export interface ApiResponse<T> {
   success?: boolean;
   data?: T;
   error?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface ImageUploadResponse {

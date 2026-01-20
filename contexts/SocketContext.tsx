@@ -15,6 +15,14 @@ interface SocketContextType {
     setMessageSentCallback: (callback: (tempId: string) => void) => void;
 }
 
+interface OfflineQueueItem {
+    content: string;
+    roomName: string;
+    timestamp: number;
+    tempId: string;
+    isImage?: boolean;
+}
+
 const SocketContext = createContext<SocketContextType | null>(null);
 
 export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
@@ -50,14 +58,14 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
         console.log(`🌐 Traitement file d'attente pour la room : ${targetRoom}`);
 
-        const messagesToSend = queue.filter((msg: any) => msg.roomName === targetRoom);
-        const messagesToKeep = queue.filter((msg: any) => msg.roomName !== targetRoom);
+        const messagesToSend = queue.filter((msg: OfflineQueueItem) => msg.roomName === targetRoom);
+        const messagesToKeep = queue.filter((msg: OfflineQueueItem) => msg.roomName !== targetRoom);
 
         if (messagesToSend.length === 0) return;
 
         console.log(`🚀 Envoi de ${messagesToSend.length} messages pour ${targetRoom}...`);
 
-        messagesToSend.forEach((msg: any) => {
+        messagesToSend.forEach((msg: OfflineQueueItem) => {
             socketInstance.emit("chat-msg", {
                 content: msg.content,
                 roomName: msg.roomName,
@@ -169,7 +177,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
             socket.timeout(5000).emit("chat-msg", {
                 content: message,
                 roomName: currentRoom,
-            }, (err: any) => {
+            }, (err: Error) => {
                 if (err) {
                     addToOfflineQueue(message, currentRoom);
                 }
@@ -193,7 +201,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
             socket!.timeout(5000).emit("chat-msg", {
                 content: imageData,
                 roomName: currentRoom,
-            }, (err: any) => {
+            }, (err: Error) => {
                 if (err) {
                     addToOfflineQueue(imageData, currentRoom, true);
                 }

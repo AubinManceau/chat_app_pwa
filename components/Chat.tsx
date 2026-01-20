@@ -11,6 +11,14 @@ import CameraView from "@/components/chat/CameraView";
 import GalleryModal from "@/components/chat/GalleryModal";
 import ImageViewer from "@/components/chat/ImageViewer";
 
+interface OfflineQueueItem {
+    content: string;
+    roomName: string;
+    timestamp: number;
+    tempId: string;
+    dateEmis?: string; // optionnel car ajouté lors du mapping
+}
+
 export default function Chat() {
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const [photo, setPhoto] = useState<string | null>(null);
@@ -34,14 +42,14 @@ export default function Chat() {
         const queue = JSON.parse(localStorage.getItem("offline_queue") || "[]");
         // Filtrer par room pour ne pas afficher les messages d'autres conversations
         const pendingMessages: Message[] = queue
-            .filter((msg: any) => msg.roomName === socket.currentRoom)
-            .map((msg: any) => ({
+            .filter((msg: OfflineQueueItem) => msg.roomName === socket.currentRoom)
+            .map((msg: OfflineQueueItem) => ({
                 content: msg.content,
                 pseudo: null,
                 pending: true,
                 tempId: msg.tempId,
                 imageData: msg.content.startsWith('data:image/') ? msg.content : undefined,
-                dateEmis: new Date(msg.timestamp).toISOString()
+                dateEmis: new Date(msg.timestamp || Date.now()).toISOString()
             }));
 
         if (pendingMessages.length > 0) {
@@ -98,6 +106,20 @@ export default function Chat() {
     }, [socket]);
 
     // Enregistrer les callbacks pour les messages en attente
+    useEffect(() => {
+        if (!socket.setPendingMessageCallback || !socket.setMessageSentCallback) return;
+
+        // Callback pour ajouter un message en attente
+        socket.setPendingMessageCallback((message: Message) => {
+            // Vérifier si le message en attente est bien pour la room courante
+            setMessages((prev) => [...prev, message]);
+        });
+
+        // Callback pour retirer un message une fois envoyé
+        socket.setMessageSentCallback((tempId: string) => {
+            setMessages((prev) => prev.filter(msg => msg.tempId !== tempId));
+        });
+    }, [socket]);
 
 
     const sendPhoto = async () => {
