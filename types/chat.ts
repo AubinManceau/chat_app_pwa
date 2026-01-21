@@ -1,4 +1,5 @@
 export interface Message {
+    id?: string; // Local ID for pending messages
     content: string;
     pseudo: string | null;
     userId?: string;
@@ -6,6 +7,8 @@ export interface Message {
     dateEmis?: string | null;
     imageId?: string;
     imageData?: string;
+    status?: 'sent' | 'pending' | 'sending' | 'failed';
+    localTimestamp?: number;
 }
 
 export interface CameraViewProps {
@@ -17,6 +20,8 @@ export interface MessageBubbleProps {
     message: Message;
     isOwnMessage: boolean;
     onImageClick: (imageData: string) => void;
+    isPending?: boolean;
+    isFailed?: boolean;
 }
 
 export interface ImagePreviewProps {

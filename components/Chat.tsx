@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useSocket } from "@/contexts/SocketContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOfflineQueue } from "@/contexts/OfflineQueueContext";
 import { sendImage, getImage } from "@/lib/api";
 import { Message } from "@/types/chat";
 import MessageBubble from "@/components/chat/MessageBubble";
@@ -21,15 +22,28 @@ export default function Chat() {
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const { pseudo } = useAuth();
     const socket = useSocket();
+    const { isConnected, queueMessage, getPendingMessages, flushRoomQueue, removeMessage } = useOfflineQueue();
+
 
     const sendMessage = () => {
         if (message.trim() === "") return;
-        socket.sendMessage(message);
+        if (!socket.currentRoom) return;
+
+        if (isConnected && socket.socket) {
+            // Online: send via socket
+            socket.sendMessage(message);
+        } else {
+            // Offline or disconnected: queue the message (it will appear via displayMessages)
+            queueMessage(socket.currentRoom, message);
+        }
+
         setMessage("");
     };
 
+    // Clear messages when room changes
     useEffect(() => {
         setMessages([]);
+        // Note: Auto-flush is handled by OfflineQueueContext
     }, [socket.currentRoom]);
 
     const scrollToBottom = () => {
@@ -65,25 +79,54 @@ export default function Chat() {
                 }
             }
 
-            setMessages((prev) => [...prev, data]);
+            // Mark message as sent and add to messages
+            const receivedMessage: Message = {
+                ...data,
+                status: 'sent'
+            };
+
+            setMessages((prev) => {
+                // Remove any pending message with same content (deduplication from local state)
+                const filtered = prev.filter(m =>
+                    !(m.status === 'pending' && m.content === data.content && m.pseudo === data.pseudo)
+                );
+                return [...filtered, receivedMessage];
+            });
+
+            // Also remove from queue if it exists (when message is confirmed by server)
+            if (socket.currentRoom) {
+                const pendingMessages = getPendingMessages(socket.currentRoom);
+                const matchingPending = pendingMessages.find(pm =>
+                    pm.content === data.content && data.pseudo === pseudo
+                );
+                if (matchingPending) {
+                    removeMessage(matchingPending.id);
+                }
+            }
         });
-    }, [socket]);
+    }, [socket, getPendingMessages, removeMessage, pseudo]);
+
 
 
     const sendPhoto = async () => {
         if (!photo || !socket.socket?.id) return;
+        if (!socket.currentRoom) return;
 
         // 1. Envoyer l'image à l'API (Système 1 - Optionnel si souhaité)
         const result = await sendImage(socket.socket.id, photo);
 
-        if (result.success) {
-            console.log("📸 Image envoyée à l'API avec succès");
-        } else {
+        if (!result.success) {
             console.error("Erreur lors de l'envoi de l'image à l'API:", result.error);
         }
 
-        // 2. Envoyer le message avec les données brutes (Nouveau système simplifié)
-        socket.sendImageMessage(photo);
+        if (isConnected && socket.socket) {
+            // Online: send via socket
+            socket.sendImageMessage(photo);
+        } else {
+            // Offline or disconnected: queue the image message (it will appear via displayMessages)
+            queueMessage(socket.currentRoom, photo, photo);
+        }
+
         setPhoto(null);
     };
 
@@ -118,6 +161,30 @@ export default function Chat() {
 
     const [showActionsMenu, setShowActionsMenu] = useState(false);
 
+    // Merge received messages with pending messages for current room
+    const displayMessages = useMemo(() => {
+        if (!socket.currentRoom) return messages;
+
+        const pendingMessages = getPendingMessages(socket.currentRoom);
+        const pendingAsMessages: Message[] = pendingMessages.map(pm => ({
+            id: pm.id,
+            content: pm.content,
+            imageData: pm.imageData,
+            pseudo: pseudo,
+            status: pm.status,
+            localTimestamp: pm.timestamp,
+            dateEmis: new Date(pm.timestamp).toISOString()
+        }));
+
+        // Combine and sort by timestamp
+        const combined = [...messages, ...pendingAsMessages];
+        return combined.sort((a, b) => {
+            const timeA = a.localTimestamp || new Date(a.dateEmis || 0).getTime();
+            const timeB = b.localTimestamp || new Date(b.dateEmis || 0).getTime();
+            return timeA - timeB;
+        });
+    }, [messages, socket.currentRoom, getPendingMessages, pseudo]);
+
     // ... (rest of the component logic)
 
     return (
@@ -125,12 +192,14 @@ export default function Chat() {
             {socket.currentRoom ? (
                 <>
                     <div className="w-full flex-1 overflow-y-auto overflow-x-hidden flex flex-col gap-1 mb-4">
-                        {messages.map((msg, index) => (
+                        {displayMessages.map((msg, index) => (
                             <MessageBubble
-                                key={index}
+                                key={msg.id || index}
                                 message={msg}
                                 isOwnMessage={msg.pseudo === pseudo}
                                 onImageClick={setSelectedImage}
+                                isPending={msg.status === 'pending' || msg.status === 'sending'}
+                                isFailed={msg.status === 'failed'}
                             />
                         ))}
                         <div ref={messagesEndRef} />
