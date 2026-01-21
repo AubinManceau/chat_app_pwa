@@ -1,9 +1,0 @@
-{
-  "/_not-found/page": "/_not-found",
-  "/api/images/route": "/api/images",
-  "/manifest.webmanifest/route": "/manifest.webmanifest",
-  "/favicon.ico/route": "/favicon.ico",
-  "/page": "/",
-  "/gallery/page": "/gallery",
-  "/chat/page": "/chat"
-}
