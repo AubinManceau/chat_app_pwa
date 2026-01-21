@@ -14,6 +14,7 @@ import ImageViewer from "@/components/chat/ImageViewer";
 
 export default function Chat() {
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [photo, setPhoto] = useState<string | null>(null);
     const [cameraOpen, setCameraOpen] = useState(false);
     const [galleryOpen, setGalleryOpen] = useState(false);
@@ -23,6 +24,28 @@ export default function Chat() {
     const { pseudo } = useAuth();
     const socket = useSocket();
     const { isConnected, queueMessage, getPendingMessages, removeMessage } = useOfflineQueue();
+
+    // Handle file selection from computer
+    const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        // Check file type
+        if (!file.type.match(/image\/(png|jpeg|jpg)/)) {
+            alert("Veuillez sélectionner une image PNG ou JPEG");
+            return;
+        }
+
+        // Convert to base64
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setPhoto(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+
+        // Reset input
+        event.target.value = '';
+    };
 
 
     const sendMessage = () => {
@@ -266,6 +289,16 @@ export default function Chat() {
                                         <span className="text-xl">🖼️</span>
                                         <span className="font-medium text-sm">Galerie</span>
                                     </button>
+                                    <button
+                                        onClick={() => {
+                                            fileInputRef.current?.click();
+                                            setShowActionsMenu(false);
+                                        }}
+                                        className="flex items-center gap-3 px-3 py-2 hover:bg-violet-50 rounded-md text-gray-700 transition-colors text-left"
+                                    >
+                                        <span className="text-xl">📁</span>
+                                        <span className="font-medium text-sm">Téléverser fichier</span>
+                                    </button>
                                     <div className="h-px bg-gray-100 my-1"></div>
                                     <button
                                         onClick={async () => {
@@ -334,6 +367,15 @@ export default function Chat() {
             />
 
             <ImageViewer imageData={selectedImage} onClose={() => setSelectedImage(null)} />
+
+            {/* Hidden file input for uploading from computer */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg"
+                onChange={handleFileSelect}
+                className="hidden"
+            />
         </div>
     );
 }
