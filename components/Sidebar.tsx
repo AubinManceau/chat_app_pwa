@@ -5,8 +5,11 @@ import { fetchData } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSocket } from "@/contexts/SocketContext";
 
+import { RoomData, ClientData } from "@/types/chat";
+
 export default function Sidebar() {
-    const [rooms, setRooms] = useState<string[]>([]);
+    const [rooms, setRooms] = useState<Record<string, RoomData>>({});
+    const [viewingRoomUsers, setViewingRoomUsers] = useState<string | null>(null);
     const [newRoomName, setNewRoomName] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
     const { pseudo } = useAuth();
@@ -15,11 +18,59 @@ export default function Sidebar() {
 
     useEffect(() => {
         const fetchRooms = async () => {
-            const data = await fetchData("/rooms");
-            if (data?.data) setRooms(Object.keys(data.data));
+            const data = await fetchData<Record<string, RoomData>>("/rooms");
+            if (data?.data) setRooms(data.data);
         };
         fetchRooms();
+
+        // Rafraichir les données toutes les 5 secondes pour avoir les connectés à jour
+        const interval = setInterval(fetchRooms, 5000);
+
+        return () => {
+            clearInterval(interval);
+        };
     }, []);
+
+    useEffect(() => {
+        if (!socket?.socket) return;
+
+        const onJoinedRoom = (data: { roomName: string, clients: Record<string, ClientData> }) => {
+            setRooms(prev => ({
+                ...prev,
+                [data.roomName]: {
+                    ...prev[data.roomName],
+                    clients: data.clients
+                }
+            }));
+        };
+
+        const onDisconnected = (data: { id: string, pseudo: string, roomName: string }) => {
+            setRooms(prev => {
+                if (!prev[data.roomName]) return prev;
+
+                const newClients = { ...prev[data.roomName].clients };
+                // Find and remove the client by ID (key in record is ID according to sample data)
+                // Sample data: "clients":{"uXt7...":{"pseudo":"...", "id":"..."}}
+                delete newClients[data.id];
+
+                return {
+                    ...prev,
+                    [data.roomName]: {
+                        ...prev[data.roomName],
+                        clients: newClients
+                    }
+                };
+            });
+        };
+
+        socket.socket.on("chat-joined-room", onJoinedRoom);
+        socket.socket.on("chat-disconnected", onDisconnected);
+
+        return () => {
+            socket.socket?.off("chat-joined-room", onJoinedRoom);
+            socket.socket?.off("chat-disconnected", onDisconnected);
+        };
+    }, [socket?.socket]);
 
     const handleJoinRoom = (roomName: string) => {
         if (!socket) return;
@@ -33,7 +84,7 @@ export default function Sidebar() {
         setOpenModal(false);
     };
 
-    const filteredRooms = rooms.filter(room =>
+    const filteredRooms = Object.keys(rooms).filter(room =>
         decodeURIComponent(room).toLowerCase().includes(searchTerm.toLowerCase())
     );
 
@@ -65,13 +116,30 @@ export default function Sidebar() {
                         filteredRooms.map((room) => (
                             <div
                                 key={room}
-                                onClick={() => handleJoinRoom(room)}
                                 className={`w-full bg-white border-l-4 ${room === socket?.currentRoom ? "border-violet-600 bg-violet-50" : "border-transparent"
-                                    } hover:border-violet-600 hover:bg-violet-50 transition-all cursor-pointer p-4 rounded-r-lg shadow-sm flex justify-between items-center`}
+                                    } hover:border-violet-600 hover:bg-violet-50 transition-all rounded-r-lg shadow-sm p-3`}
                             >
-                                <p className="truncate font-medium text-[15px] text-gray-700">
-                                    {decodeURIComponent(room)}
-                                </p>
+                                <div className="w-full cursor-pointer" onClick={() => handleJoinRoom(room)}>
+                                    <p className="truncate font-medium text-[15px] text-gray-700">
+                                        {decodeURIComponent(room)}
+                                    </p>
+                                    <div className="flex justify-between items-center mt-1">
+                                        <p className="text-xs text-gray-400">
+                                            {Object.keys(rooms[room].clients).length} connecté(s)
+                                        </p>
+                                        {room === socket?.currentRoom && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setViewingRoomUsers(room);
+                                                }}
+                                                className="bg-violet-100 text-violet-600 hover:bg-violet-200 px-3 py-1 rounded-full text-xs font-semibold transition-colors"
+                                            >
+                                                VOIR
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         ))
                     ) : (
@@ -83,21 +151,70 @@ export default function Sidebar() {
             </div>
 
             {openModal && (
-                <div className="w-screen h-screen overflow-hidden absolute top-0 left-0 z-20">
-                    <div className="w-full h-full bg-black opacity-70 flex justify-center items-center" onClick={() => setOpenModal(false)}>
-
-                    </div>
-                    <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white px-6 py-4 rounded-lg flex flex-col items-start gap-4">
-                        <h2 className="text-xl font-semibold">Créer une nouvelle conversation</h2>
+                <div className="w-screen h-screen fixed top-0 left-0 z-50 flex justify-center items-center">
+                    <div className="absolute w-full h-full bg-black/60 backdrop-blur-sm" onClick={() => setOpenModal(false)}></div>
+                    <div className="bg-white px-6 py-6 rounded-2xl shadow-2xl flex flex-col gap-4 w-[90%] max-w-md relative z-10 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-xl font-bold text-gray-800">Nouvelle conversation</h2>
+                            <button onClick={() => setOpenModal(false)} className="text-gray-400 hover:text-gray-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
                         <input
                             type="text"
-                            className="w-full border-1 border-black p-1 rounded-md"
+                            className="w-full border border-gray-300 p-3 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none transition-all"
                             value={newRoomName}
                             onChange={(e) => setNewRoomName(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && handleCreateRoom()}
-                            placeholder="Nom de la conversation"
+                            placeholder="Nom de la conversation..."
+                            autoFocus
                         />
-                        <button onClick={handleCreateRoom} className="bg-violet-600 px-4 py-1 cursor-pointer rounded-md text-white">Créer</button>
+                        <button onClick={handleCreateRoom} className="bg-violet-600 hover:bg-violet-700 w-full py-3 rounded-xl text-white font-semibold shadow-lg shadow-violet-200 transition-all transform active:scale-95">
+                            Créer la conversation
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {viewingRoomUsers && (
+                <div className="w-screen h-screen fixed top-0 left-0 z-50 flex justify-center items-center">
+                    <div className="absolute w-full h-full bg-black/60 backdrop-blur-sm" onClick={() => setViewingRoomUsers(null)}></div>
+                    <div className="bg-white px-6 py-6 rounded-2xl shadow-2xl flex flex-col gap-4 w-[90%] max-w-md relative z-10 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+                            <h2 className="text-xl font-bold text-gray-800">
+                                Utilisateurs connectés
+                                <span className="block text-sm text-violet-600 font-normal mt-1">
+                                    {decodeURIComponent(viewingRoomUsers)}
+                                </span>
+                            </h2>
+                            <button onClick={() => setViewingRoomUsers(null)} className="text-gray-400 hover:text-gray-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
+                            {rooms[viewingRoomUsers] && Object.values(rooms[viewingRoomUsers].clients).length > 0 ? (
+                                <div className="flex flex-col gap-2">
+                                    {Object.values(rooms[viewingRoomUsers].clients).map((client) => (
+                                        <div key={client.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg transition-colors">
+                                            <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center font-bold text-sm">
+                                                {client.pseudo.charAt(0).toUpperCase()}
+                                            </div>
+                                            <span className="font-medium text-gray-700">{client.pseudo}</span>
+                                            {client.id === socket?.socketId && (
+                                                <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full ml-auto">Vous</span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-center text-gray-500 py-4">Aucun utilisateur connecté</p>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

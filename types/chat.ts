@@ -34,3 +34,14 @@ export interface ImageViewerProps {
     imageData: string | null;
     onClose: () => void;
 }
+
+export interface ClientData {
+    pseudo: string;
+    roomName: string;
+    id: string;
+    initiator?: boolean;
+}
+
+export interface RoomData {
+    clients: Record<string, ClientData>;
+}

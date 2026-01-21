@@ -6,6 +6,7 @@ import { Message } from "@/types/chat";
 
 interface SocketContextType {
     socket: Socket | null;
+    socketId: string | null;
     currentRoom: string | null;
     joinRoom: (roomName: string, pseudo: string | null) => void;
     sendMessage: (message: string, pseudo?: string | null) => void;
@@ -18,21 +19,25 @@ const SocketContext = createContext<SocketContextType | null>(null);
 export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     const [socket, setSocket] = useState<Socket | null>(null);
     const [currentRoom, setCurrentRoom] = useState<string | null>(null);
+    const [socketId, setSocketId] = useState<string | null>(null);
 
     useEffect(() => {
         const newSocket = io("https://api.tools.gavago.fr", {
             transports: ["websocket"],
             autoConnect: true,
             reconnection: true,
-            reconnectionAttempts: Infinity
+            reconnectionAttempts: Infinity,
+            forceNew: true
         });
 
         newSocket.on("connect", () => {
             console.log("🟢 Connecté au serveur Socket.IO");
+            setSocketId(newSocket.id || null);
         });
 
         newSocket.on("disconnect", (reason) => {
             console.log("🔴 Déconnecté du serveur Socket.IO", reason);
+            setSocketId(null);
         });
 
         newSocket.on("connect_error", (error) => {
@@ -50,8 +55,15 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
         if (!socket) return;
 
         if (currentRoom === roomName) return;
-        socket.off("chat-join-room");
-        setCurrentRoom(null);
+
+        // Déconnecter et reconnecter pour quitter proprement l'ancienne room
+        socket.disconnect();
+        socket.connect();
+
+        // Attendre la reconnexion avant d'émettre (via event listener once) ou laisser socket.io bufferiser
+        // Socket.io bufferise les emits tant que non connecté, mais pour être sûr de l'ordre :
+
+        // Note: socket.id va changer après reconnexion
 
         socket.emit("chat-join-room", { pseudo, roomName });
         setCurrentRoom(roomName);
@@ -89,6 +101,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     return (
         <SocketContext.Provider value={{
             socket,
+            socketId,
             currentRoom,
             joinRoom,
             sendMessage,
