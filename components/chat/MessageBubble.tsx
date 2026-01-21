@@ -3,20 +3,19 @@
 import { useEffect, useState } from "react";
 import { MessageBubbleProps } from "@/types/chat";
 import { getImage } from "@/lib/api";
+import { formatMessageDate } from "@/utils/formatters";
 
 export default function MessageBubble({ message, isOwnMessage, onImageClick, isPending, isFailed }: MessageBubbleProps) {
     const [imgData, setImgData] = useState<string | null>(message.imageData || null);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        // Mettre à jour si les props changent
         if (message.imageData) {
             setImgData(message.imageData);
         }
     }, [message.imageData]);
 
     useEffect(() => {
-        // Si on a un ID mais pas de données, on charge l'image
         if (message.imageId && !imgData && !loading) {
             const fetchImage = async () => {
                 setLoading(true);
@@ -28,22 +27,9 @@ export default function MessageBubble({ message, isOwnMessage, onImageClick, isP
             };
             fetchImage();
         }
-    }, [message.imageId, imgData]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [message.imageId, imgData]);
 
-    const date = new Date(message.dateEmis ?? Date.now());
-    const now = new Date();
-    const isToday =
-        date.getDate() === now.getDate() &&
-        date.getMonth() === now.getMonth() &&
-        date.getFullYear() === now.getFullYear();
-
-    const pad = (n: number) => n.toString().padStart(2, "0");
-    const hours = pad(date.getHours());
-    const minutes = pad(date.getMinutes());
-    const formattedDate = isToday
-        ? `${hours}:${minutes}`
-        : `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} - ${hours}:${minutes}`;
-
+    const formattedDate = formatMessageDate(message.dateEmis);
     const hasImage = imgData || message.imageId;
 
     return (

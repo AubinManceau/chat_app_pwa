@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://api.tools.gavago.fr/socketio/api";
+import { API_BASE_URL } from "@/utils/constants";
 
 export interface ApiResponse<T> {
   success?: boolean;
@@ -17,25 +17,21 @@ export interface ImageGetResponse {
   data_image?: string;
 }
 
+const createHeaders = () => ({
+  "Content-Type": "application/json",
+  "Accept": "application/json",
+});
+
 export async function fetchData<T>(endpoint: string): Promise<ApiResponse<T>> {
   try {
-    const headers = {
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-    };
-
     const url = `${API_BASE_URL}${endpoint}`;
-
-    const res = await fetch(url, {
-      headers
-    });
+    const res = await fetch(url, { headers: createHeaders() });
 
     if (!res.ok) {
       throw new Error(`Erreur HTTP! Statut: ${res.status}`);
     }
 
-    const data = await res.json();
-    return data;
+    return await res.json();
   } catch (error) {
     return { error: (error as Error).message };
   }
@@ -43,16 +39,9 @@ export async function fetchData<T>(endpoint: string): Promise<ApiResponse<T>> {
 
 export async function sendImage(socketId: string, imageData: string): Promise<ApiResponse<ImageUploadResponse>> {
   try {
-    const headers = {
-      "Content-Type": "application/json",
-    };
-
-    // Utiliser le proxy local pour éviter les problèmes CORS
-    const url = `/api/images`;
-
-    const res = await fetch(url, {
+    const res = await fetch("/api/images", {
       method: "POST",
-      headers,
+      headers: createHeaders(),
       body: JSON.stringify({
         id: socketId,
         image_data: imageData
@@ -63,8 +52,7 @@ export async function sendImage(socketId: string, imageData: string): Promise<Ap
       throw new Error(`Erreur HTTP! Statut: ${res.status}`);
     }
 
-    const data = await res.json();
-    return data;
+    return await res.json();
   } catch (error) {
     return { error: (error as Error).message };
   }
@@ -72,24 +60,15 @@ export async function sendImage(socketId: string, imageData: string): Promise<Ap
 
 export async function getImage(imageId: string): Promise<ApiResponse<ImageGetResponse>> {
   try {
-    const headers = {
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-    };
-
-    // Utiliser le proxy local pour éviter les problèmes CORS
-    const url = `/api/images?id=${imageId}`;
-
-    const res = await fetch(url, {
-      headers
+    const res = await fetch(`/api/images?id=${imageId}`, {
+      headers: createHeaders()
     });
 
     if (!res.ok) {
       throw new Error(`Erreur HTTP! Statut: ${res.status}`);
     }
 
-    const data = await res.json();
-    return data;
+    return await res.json();
   } catch (error) {
     return { error: (error as Error).message };
   }

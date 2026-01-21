@@ -3,6 +3,8 @@ import { SocketProvider } from "@/contexts/SocketContext";
 import "./globals.css";
 import Header from "@/components/Header";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
+import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 
 export const metadata: Metadata = {
   title: "Accueil - Next.js",
@@ -15,8 +17,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className="h-screen overflow-y-hidden">
         <div className="flex flex-col h-full">
           <AuthProvider>
-            <Header />
-            {children}
+            <NotificationProvider>
+              <ServiceWorkerRegistration />
+              <Header />
+              {children}
+            </NotificationProvider>
           </AuthProvider>
         </div>
       </body>

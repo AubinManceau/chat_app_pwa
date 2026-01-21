@@ -1,66 +1,30 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchData } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSocket } from "@/contexts/SocketContext";
-
-import { RoomData, ClientData } from "@/types/chat";
+import { useRoomManagement } from "@/hooks/useRoomManagement";
+import { decodeRoomName, encodeRoomName } from "@/utils/formatters";
+import { ClientData } from "@/types/chat";
 
 export default function Sidebar() {
-    const [rooms, setRooms] = useState<Record<string, RoomData>>({});
     const [viewingRoomUsers, setViewingRoomUsers] = useState<string | null>(null);
     const [newRoomName, setNewRoomName] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
     const { pseudo } = useAuth();
     const socket = useSocket();
     const [openModal, setOpenModal] = useState(false);
-
-    useEffect(() => {
-        const fetchRooms = async () => {
-            const data = await fetchData<Record<string, RoomData>>("/rooms");
-            if (data?.data) setRooms(data.data);
-        };
-        fetchRooms();
-
-        // Rafraichir les données toutes les 5 secondes pour avoir les connectés à jour
-        const interval = setInterval(fetchRooms, 5000);
-
-        return () => {
-            clearInterval(interval);
-        };
-    }, []);
+    const { rooms, updateRoomClients, removeClientFromRoom } = useRoomManagement();
 
     useEffect(() => {
         if (!socket?.socket) return;
 
         const onJoinedRoom = (data: { roomName: string, clients: Record<string, ClientData> }) => {
-            setRooms(prev => ({
-                ...prev,
-                [data.roomName]: {
-                    ...prev[data.roomName],
-                    clients: data.clients
-                }
-            }));
+            updateRoomClients(data.roomName, data.clients);
         };
 
         const onDisconnected = (data: { id: string, pseudo: string, roomName: string }) => {
-            setRooms(prev => {
-                if (!prev[data.roomName]) return prev;
-
-                const newClients = { ...prev[data.roomName].clients };
-                // Find and remove the client by ID (key in record is ID according to sample data)
-                // Sample data: "clients":{"uXt7...":{"pseudo":"...", "id":"..."}}
-                delete newClients[data.id];
-
-                return {
-                    ...prev,
-                    [data.roomName]: {
-                        ...prev[data.roomName],
-                        clients: newClients
-                    }
-                };
-            });
+            removeClientFromRoom(data.roomName, data.id);
         };
 
         socket.socket.on("chat-joined-room", onJoinedRoom);
@@ -70,7 +34,7 @@ export default function Sidebar() {
             socket.socket?.off("chat-joined-room", onJoinedRoom);
             socket.socket?.off("chat-disconnected", onDisconnected);
         };
-    }, [socket?.socket]);
+    }, [socket?.socket, updateRoomClients, removeClientFromRoom]);
 
     const handleJoinRoom = (roomName: string) => {
         if (!socket) return;
@@ -79,13 +43,13 @@ export default function Sidebar() {
 
     const handleCreateRoom = async () => {
         if (newRoomName.trim() === "") return;
-        handleJoinRoom(encodeURIComponent(newRoomName.trim()));
+        handleJoinRoom(encodeRoomName(newRoomName));
         setNewRoomName("");
         setOpenModal(false);
     };
 
     const filteredRooms = Object.keys(rooms).filter(room =>
-        decodeURIComponent(room).toLowerCase().includes(searchTerm.toLowerCase())
+        decodeRoomName(room).toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     return (
@@ -121,7 +85,7 @@ export default function Sidebar() {
                             >
                                 <div className="w-full cursor-pointer" onClick={() => handleJoinRoom(room)}>
                                     <p className="truncate font-medium text-[15px] text-gray-700">
-                                        {decodeURIComponent(room)}
+                                        {decodeRoomName(room)}
                                     </p>
                                     <div className="flex justify-between items-center mt-1">
                                         <p className="text-xs text-gray-400">
@@ -186,7 +150,7 @@ export default function Sidebar() {
                             <h2 className="text-xl font-bold text-gray-800">
                                 Utilisateurs connectés
                                 <span className="block text-sm text-violet-600 font-normal mt-1">
-                                    {decodeURIComponent(viewingRoomUsers)}
+                                    {decodeRoomName(viewingRoomUsers)}
                                 </span>
                             </h2>
                             <button onClick={() => setViewingRoomUsers(null)} className="text-gray-400 hover:text-gray-600">

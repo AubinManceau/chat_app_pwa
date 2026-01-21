@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { useSocket } from "./SocketContext";
+import { OFFLINE_QUEUE_CONFIG } from "@/utils/constants";
+import { generateUniqueId } from "@/utils/formatters";
 
 export interface PendingMessage {
     id: string;
@@ -14,8 +16,8 @@ export interface PendingMessage {
 }
 
 interface OfflineQueueContextType {
-    isOnline: boolean; // Network state (navigator.onLine)
-    isConnected: boolean; // Combined: network + socket connection
+    isOnline: boolean;
+    isConnected: boolean;
     queueMessage: (roomId: string, content: string, imageData?: string) => PendingMessage;
     getPendingMessages: (roomId: string) => PendingMessage[];
     flushRoomQueue: (roomId: string) => Promise<void>;
@@ -32,12 +34,10 @@ export const OfflineQueueProvider = ({ children }: { children: React.ReactNode }
     const [messageQueue, setMessageQueue] = useState<Map<string, PendingMessage[]>>(new Map());
     const { socket, currentRoom, sendMessage: socketSendMessage, sendImageMessage: socketSendImageMessage } = useSocket();
     const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-    const flushingRoomsRef = useRef<Set<string>>(new Set()); // Track rooms being flushed
+    const flushingRoomsRef = useRef<Set<string>>(new Set());
 
-    // Combined connection state: both network AND socket must be connected
     const isConnected = isOnline && isSocketConnected;
 
-    // Track socket connection state with periodic checks
     useEffect(() => {
         if (!socket) {
             setIsSocketConnected(false);
@@ -47,17 +47,15 @@ export const OfflineQueueProvider = ({ children }: { children: React.ReactNode }
         const handleConnect = () => setIsSocketConnected(true);
         const handleDisconnect = () => setIsSocketConnected(false);
 
-        // Set initial state
         setIsSocketConnected(socket.connected);
 
         socket.on('connect', handleConnect);
         socket.on('disconnect', handleDisconnect);
 
-        // Heartbeat: check connection every 2 seconds
         const heartbeatInterval = setInterval(() => {
             const currentlyConnected = socket.connected;
             setIsSocketConnected(currentlyConnected);
-        }, 500);
+        }, OFFLINE_QUEUE_CONFIG.heartbeatInterval);
 
         return () => {
             socket.off('connect', handleConnect);
@@ -66,7 +64,6 @@ export const OfflineQueueProvider = ({ children }: { children: React.ReactNode }
         };
     }, [socket]);
 
-    // Network state detection with debouncing
     useEffect(() => {
         const updateOnlineStatus = () => {
             if (debounceTimerRef.current) {
@@ -76,10 +73,9 @@ export const OfflineQueueProvider = ({ children }: { children: React.ReactNode }
             debounceTimerRef.current = setTimeout(() => {
                 const online = navigator.onLine;
                 setIsOnline(online);
-            }, 300);
+            }, OFFLINE_QUEUE_CONFIG.debounceTime);
         };
 
-        // Initial state
         setIsOnline(navigator.onLine);
 
         window.addEventListener('online', updateOnlineStatus);
@@ -94,15 +90,9 @@ export const OfflineQueueProvider = ({ children }: { children: React.ReactNode }
         };
     }, []);
 
-    // Generate unique ID for messages
-    const generateMessageId = () => {
-        return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    };
-
-    // Queue a message
     const queueMessage = useCallback((roomId: string, content: string, imageData?: string): PendingMessage => {
         const pendingMessage: PendingMessage = {
-            id: generateMessageId(),
+            id: generateUniqueId(),
             roomId,
             content,
             imageData,
@@ -121,12 +111,10 @@ export const OfflineQueueProvider = ({ children }: { children: React.ReactNode }
         return pendingMessage;
     }, []);
 
-    // Get pending messages for a specific room
     const getPendingMessages = useCallback((roomId: string): PendingMessage[] => {
         return messageQueue.get(roomId) || [];
     }, [messageQueue]);
 
-    // Get all pending messages across all rooms
     const getAllPendingMessages = useCallback((): PendingMessage[] => {
         const allMessages: PendingMessage[] = [];
         messageQueue.forEach(messages => {
@@ -135,7 +123,6 @@ export const OfflineQueueProvider = ({ children }: { children: React.ReactNode }
         return allMessages;
     }, [messageQueue]);
 
-    // Update message status
     const updateMessageStatus = useCallback((messageId: string, status: PendingMessage['status']) => {
         setMessageQueue(prev => {
             const newQueue = new Map(prev);
@@ -158,7 +145,6 @@ export const OfflineQueueProvider = ({ children }: { children: React.ReactNode }
         });
     }, []);
 
-    // Remove message from queue
     const removeMessage = useCallback((messageId: string) => {
         setMessageQueue(prev => {
             const newQueue = new Map(prev);
@@ -180,9 +166,7 @@ export const OfflineQueueProvider = ({ children }: { children: React.ReactNode }
         });
     }, []);
 
-    // Flush queue for a specific room
     const flushRoomQueue = useCallback(async (roomId: string) => {
-        // Check if already flushing this room
         if (flushingRoomsRef.current.has(roomId)) {
             return;
         }
@@ -196,37 +180,28 @@ export const OfflineQueueProvider = ({ children }: { children: React.ReactNode }
             return;
         }
 
-        // Mark room as being flushed
         flushingRoomsRef.current.add(roomId);
 
         try {
-            // Process messages sequentially
             for (const message of pendingMessages) {
-                if (message.status === 'failed' && message.retryCount >= 3) {
+                if (message.status === 'failed' && message.retryCount >= OFFLINE_QUEUE_CONFIG.maxRetryCount) {
                     continue;
                 }
 
                 try {
-                    // Update status to sending
                     updateMessageStatus(message.id, 'sending');
 
-                    // Send the message
                     if (message.imageData) {
                         socketSendImageMessage(message.imageData);
                     } else {
                         socketSendMessage(message.content);
                     }
 
-                    // Wait a bit to ensure message is sent
-                    await new Promise(resolve => setTimeout(resolve, 100));
+                    await new Promise(resolve => setTimeout(resolve, OFFLINE_QUEUE_CONFIG.sendDelay));
 
-                    // Remove from queue on success
                     removeMessage(message.id);
 
                 } catch (error) {
-                    console.error(`Failed to send message ${message.id}:`, error);
-
-                    // Update retry count and status
                     setMessageQueue(prev => {
                         const newQueue = new Map(prev);
                         const roomMessages = newQueue.get(roomId);
@@ -247,17 +222,15 @@ export const OfflineQueueProvider = ({ children }: { children: React.ReactNode }
                 }
             }
         } finally {
-            // Always remove the lock when done
             flushingRoomsRef.current.delete(roomId);
         }
     }, [socket, isConnected, messageQueue, updateMessageStatus, removeMessage, socketSendMessage, socketSendImageMessage]);
 
-    // Auto-flush when coming online and in a room
     useEffect(() => {
         if (isConnected && currentRoom && socket) {
             const timer = setTimeout(() => {
                 flushRoomQueue(currentRoom);
-            }, 500); // Small delay to ensure socket is fully ready
+            }, OFFLINE_QUEUE_CONFIG.flushDelay);
 
             return () => clearTimeout(timer);
         }

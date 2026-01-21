@@ -1,73 +1,56 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useSocket } from "@/contexts/SocketContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOfflineQueue } from "@/contexts/OfflineQueueContext";
+import { useNotification } from "@/contexts/NotificationContext";
 import { sendImage } from "@/lib/api";
-import { Message } from "@/types/chat";
+import { useMessageHandling } from "@/hooks/useMessageHandling";
+import { useFileHandling } from "@/hooks/useFileHandling";
+import { getBatteryStatus, getCurrentPosition } from "@/utils/deviceFeatures";
 import MessageBubble from "@/components/chat/MessageBubble";
 import ImagePreview from "@/components/chat/ImagePreview";
 import CameraView from "@/components/chat/CameraView";
 import GalleryModal from "@/components/chat/GalleryModal";
 import ImageViewer from "@/components/chat/ImageViewer";
+import { Message } from "@/types/chat";
 
 export default function Chat() {
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
-    const [photo, setPhoto] = useState<string | null>(null);
     const [cameraOpen, setCameraOpen] = useState(false);
     const [galleryOpen, setGalleryOpen] = useState(false);
     const [message, setMessage] = useState("");
-    const [messages, setMessages] = useState<Message[]>([]);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const [showActionsMenu, setShowActionsMenu] = useState(false);
+
     const { pseudo } = useAuth();
     const socket = useSocket();
     const { isConnected, queueMessage, getPendingMessages, removeMessage } = useOfflineQueue();
+    const { selectedFile: photo, handleFileSelect, clearFile: deletePhoto, setSelectedFile: setPhoto } = useFileHandling();
+    const { permission, requestPermission, showNotification } = useNotification();
 
-    // Handle file selection from computer
-    const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
+    const handleMessageReceived = useCallback((receivedMessage: Message) => {
+        if (receivedMessage.pseudo !== pseudo) {
+            const notificationBody = receivedMessage.imageData
+                ? "📷 Photo"
+                : receivedMessage.content;
 
-        // Check file type
-        if (!file.type.match(/image\/(png|jpeg|jpg)/)) {
-            alert("Veuillez sélectionner une image PNG ou JPEG");
-            return;
+            showNotification(`${receivedMessage.pseudo} dans ${socket.currentRoom}`, {
+                body: notificationBody,
+                tag: `chat-${socket.currentRoom}`,
+                data: { room: socket.currentRoom }
+            });
         }
+    }, [pseudo, socket.currentRoom, showNotification]);
 
-        // Convert to base64
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            setPhoto(reader.result as string);
-        };
-        reader.readAsDataURL(file);
-
-        // Reset input
-        event.target.value = '';
-    };
-
-
-    const sendMessage = () => {
-        if (message.trim() === "") return;
-        if (!socket.currentRoom) return;
-
-        if (isConnected && socket.socket) {
-            // Online: send via socket
-            socket.sendMessage(message);
-        } else {
-            // Offline or disconnected: queue the message (it will appear via displayMessages)
-            queueMessage(socket.currentRoom, message);
-        }
-
-        setMessage("");
-    };
-
-    // Clear messages when room changes
-    useEffect(() => {
-        setMessages([]);
-        // Note: Auto-flush is handled by OfflineQueueContext
-    }, [socket.currentRoom]);
+    const { displayMessages, processIncomingMessage, clearMessages } = useMessageHandling(
+        socket.currentRoom,
+        pseudo,
+        getPendingMessages,
+        handleMessageReceived
+    );
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -75,49 +58,25 @@ export default function Chat() {
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages]);
+    }, [displayMessages]);
+
+    useEffect(() => {
+        clearMessages();
+    }, [socket.currentRoom, clearMessages]);
+
+    useEffect(() => {
+        if (socket.currentRoom && permission === "default") {
+            requestPermission();
+        }
+    }, [socket.currentRoom, permission, requestPermission]);
 
     useEffect(() => {
         if (!socket.socket) return;
 
-        socket.getMessages((data: Message) => {
-            if (data.pseudo === "SERVER") return;
+        socket.getMessages((data) => {
+            const receivedMessage = processIncomingMessage(data);
 
-            // Nouveau : Données brutes (simplifié par l'utilisateur)
-            if (!data.imageData && data.content.startsWith('data:image/')) {
-                data.imageData = data.content;
-            }
-
-
-            // Si c'est une image, on extrait l'ID
-            if (data.imageData) {
-                // Pour les messages entrants, on n'a pas forcément l'ID de l'image
-                // Il faudrait que le back renvoie l'ID s'il est stocké
-                // Pour l'instant on suppose que le content contient l'URL si c'est un message système
-            } else if (data.content && data.content.includes('/images/')) {
-                // Tentative d'extraction d'ID depuis l'URL si présent dans le content
-                const urlMatch = data.content.match(/https?:\/\/[^\s]+\/images\/([^\s]+)/);
-                if (urlMatch && urlMatch[1]) {
-                    data.imageId = urlMatch[1];
-                }
-            }
-
-            // Mark message as sent and add to messages
-            const receivedMessage: Message = {
-                ...data,
-                status: 'sent'
-            };
-
-            setMessages((prev) => {
-                // Remove any pending message with same content (deduplication from local state)
-                const filtered = prev.filter(m =>
-                    !(m.status === 'pending' && m.content === data.content && m.pseudo === data.pseudo)
-                );
-                return [...filtered, receivedMessage];
-            });
-
-            // Also remove from queue if it exists (when message is confirmed by server)
-            if (socket.currentRoom) {
+            if (socket.currentRoom && receivedMessage) {
                 const pendingMessages = getPendingMessages(socket.currentRoom);
                 const matchingPending = pendingMessages.find(pm =>
                     pm.content === data.content && data.pseudo === pseudo
@@ -127,15 +86,23 @@ export default function Chat() {
                 }
             }
         });
-    }, [socket, getPendingMessages, removeMessage, pseudo]);
+    }, [socket, processIncomingMessage, getPendingMessages, removeMessage, pseudo]);
 
+    const sendTextMessage = () => {
+        if (message.trim() === "" || !socket.currentRoom) return;
 
+        if (isConnected && socket.socket) {
+            socket.sendMessage(message);
+        } else {
+            queueMessage(socket.currentRoom, message);
+        }
+
+        setMessage("");
+    };
 
     const sendPhoto = async () => {
-        if (!photo || !socket.socket?.id) return;
-        if (!socket.currentRoom) return;
+        if (!photo || !socket.socket?.id || !socket.currentRoom) return;
 
-        // 1. Envoyer l'image à l'API (Système 1 - Optionnel si souhaité)
         const result = await sendImage(socket.socket.id, photo);
 
         if (!result.success) {
@@ -143,17 +110,11 @@ export default function Chat() {
         }
 
         if (isConnected && socket.socket) {
-            // Online: send via socket
             socket.sendImageMessage(photo);
         } else {
-            // Offline or disconnected: queue the image message (it will appear via displayMessages)
             queueMessage(socket.currentRoom, photo, photo);
         }
 
-        setPhoto(null);
-    };
-
-    const deletePhoto = () => {
         setPhoto(null);
     };
 
@@ -168,7 +129,7 @@ export default function Chat() {
         if (photo) {
             sendPhoto();
         } else if (message.trim() !== "") {
-            sendMessage();
+            sendTextMessage();
         }
     };
 
@@ -182,33 +143,25 @@ export default function Chat() {
         setGalleryOpen(false);
     };
 
-    const [showActionsMenu, setShowActionsMenu] = useState(false);
+    const handleBatteryShare = async () => {
+        setShowActionsMenu(false);
+        try {
+            const batteryMessage = await getBatteryStatus();
+            socket.sendMessage(batteryMessage);
+        } catch (error) {
+            alert((error as Error).message);
+        }
+    };
 
-    // Merge received messages with pending messages for current room
-    const displayMessages = useMemo(() => {
-        if (!socket.currentRoom) return messages;
-
-        const pendingMessages = getPendingMessages(socket.currentRoom);
-        const pendingAsMessages: Message[] = pendingMessages.map(pm => ({
-            id: pm.id,
-            content: pm.content,
-            imageData: pm.imageData,
-            pseudo: pseudo,
-            status: pm.status,
-            localTimestamp: pm.timestamp,
-            dateEmis: new Date(pm.timestamp).toISOString()
-        }));
-
-        // Combine and sort by timestamp
-        const combined = [...messages, ...pendingAsMessages];
-        return combined.sort((a, b) => {
-            const timeA = a.localTimestamp || new Date(a.dateEmis || 0).getTime();
-            const timeB = b.localTimestamp || new Date(b.dateEmis || 0).getTime();
-            return timeA - timeB;
-        });
-    }, [messages, socket.currentRoom, getPendingMessages, pseudo]);
-
-    // ... (rest of the component logic)
+    const handleLocationShare = async () => {
+        setShowActionsMenu(false);
+        try {
+            const locationMessage = await getCurrentPosition();
+            socket.sendMessage(locationMessage);
+        } catch (error) {
+            alert((error as Error).message);
+        }
+    };
 
     return (
         <div className="h-[calc(100vh-57px)] w-5/7 flex flex-col items-center justify-end px-12 py-4" onClick={() => setShowActionsMenu(false)}>
@@ -244,7 +197,6 @@ export default function Chat() {
                                 className="border rounded-full pl-4 pr-16 py-3 w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400 disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-700"
                             />
 
-                            {/* Bouton d'envoi */}
                             <button
                                 onClick={handleSendClick}
                                 className="absolute right-4 text-violet-600 hover:text-violet-800 transition-colors cursor-pointer p-1"
@@ -255,7 +207,6 @@ export default function Chat() {
                                 </svg>
                             </button>
 
-                            {/* Bouton Actions (Plus) */}
                             <button
                                 onClick={() => setShowActionsMenu(!showActionsMenu)}
                                 className={`absolute right-12 text-gray-500 hover:text-violet-600 transition-colors cursor-pointer p-1 rounded-full ${showActionsMenu ? 'bg-gray-100 text-violet-600' : ''}`}
@@ -266,7 +217,6 @@ export default function Chat() {
                                 </svg>
                             </button>
 
-                            {/* Dropdown Menu */}
                             {showActionsMenu && (
                                 <div className="absolute right-0 bottom-14 bg-white rounded-lg shadow-xl border border-gray-100 p-2 flex flex-col gap-1 min-w-[200px] z-10 animate-in fade-in slide-in-from-bottom-2 duration-200">
                                     <button
@@ -301,47 +251,14 @@ export default function Chat() {
                                     </button>
                                     <div className="h-px bg-gray-100 my-1"></div>
                                     <button
-                                        onClick={async () => {
-                                            setShowActionsMenu(false);
-                                            try {
-                                                if (!navigator.getBattery) {
-                                                    alert("Cette fonctionnalité n'est pas supportée sur votre appareil (ex: iOS).");
-                                                    return;
-                                                }
-                                                const battery = await navigator.getBattery();
-                                                const level = Math.round(battery.level * 100);
-                                                const icon = level > 20 ? '🔋' : '🪫';
-                                                const charging = battery.charging ? '⚡' : '';
-                                                socket.sendMessage(`${icon} J'ai ${level}% de batterie ${charging}`);
-                                            } catch (e) {
-                                                console.error(e);
-                                                alert("Impossible d'accéder aux infos de batterie");
-                                            }
-                                        }}
+                                        onClick={handleBatteryShare}
                                         className="flex items-center gap-3 px-3 py-2 hover:bg-violet-50 rounded-md text-gray-700 transition-colors text-left"
                                     >
                                         <span className="text-xl">⚡</span>
                                         <span className="font-medium text-sm">Partager batterie</span>
                                     </button>
                                     <button
-                                        onClick={() => {
-                                            setShowActionsMenu(false);
-                                            if (!navigator.geolocation) {
-                                                alert("La géolocalisation n'est pas supportée par votre navigateur.");
-                                                return;
-                                            }
-                                            navigator.geolocation.getCurrentPosition(
-                                                (position) => {
-                                                    const { latitude, longitude } = position.coords;
-                                                    const link = `https://www.google.com/maps?q=${latitude},${longitude}`;
-                                                    socket.sendMessage(`📍 Ma position : ${link}`);
-                                                },
-                                                (error) => {
-                                                    console.error("Erreur géolocalisation:", error);
-                                                    alert("Impossible de récupérer votre position (autorisation refusée ?)");
-                                                }
-                                            );
-                                        }}
+                                        onClick={handleLocationShare}
                                         className="flex items-center gap-3 px-3 py-2 hover:bg-violet-50 rounded-md text-gray-700 transition-colors text-left"
                                     >
                                         <span className="text-xl">📍</span>
@@ -368,7 +285,6 @@ export default function Chat() {
 
             <ImageViewer imageData={selectedImage} onClose={() => setSelectedImage(null)} />
 
-            {/* Hidden file input for uploading from computer */}
             <input
                 ref={fileInputRef}
                 type="file"

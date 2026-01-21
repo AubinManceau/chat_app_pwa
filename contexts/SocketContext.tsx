@@ -1,8 +1,9 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useRef } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { Message } from "@/types/chat";
+import { SOCKET_URL, SOCKET_CONFIG } from "@/utils/constants";
 
 interface SocketContextType {
     socket: Socket | null;
@@ -22,26 +23,14 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     const [socketId, setSocketId] = useState<string | null>(null);
 
     useEffect(() => {
-        const newSocket = io("https://api.tools.gavago.fr", {
-            transports: ["websocket"],
-            autoConnect: true,
-            reconnection: true,
-            reconnectionAttempts: Infinity,
-            forceNew: true
-        });
+        const newSocket = io(SOCKET_URL, SOCKET_CONFIG);
 
         newSocket.on("connect", () => {
-            console.log("🟢 Connecté au serveur Socket.IO");
             setSocketId(newSocket.id || null);
         });
 
-        newSocket.on("disconnect", (reason) => {
-            console.log("🔴 Déconnecté du serveur Socket.IO", reason);
+        newSocket.on("disconnect", () => {
             setSocketId(null);
-        });
-
-        newSocket.on("connect_error", (error) => {
-            console.log("⚠️ Erreur de connexion Socket.IO", error);
         });
 
         setSocket(newSocket);
@@ -52,18 +41,10 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     }, []);
 
     const joinRoom = (roomName: string, pseudo: string | null) => {
-        if (!socket) return;
+        if (!socket || currentRoom === roomName) return;
 
-        if (currentRoom === roomName) return;
-
-        // Déconnecter et reconnecter pour quitter proprement l'ancienne room
         socket.disconnect();
         socket.connect();
-
-        // Attendre la reconnexion avant d'émettre (via event listener once) ou laisser socket.io bufferiser
-        // Socket.io bufferise les emits tant que non connecté, mais pour être sûr de l'ordre :
-
-        // Note: socket.id va changer après reconnexion
 
         socket.emit("chat-join-room", { pseudo, roomName });
         setCurrentRoom(roomName);
@@ -94,9 +75,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
         socket.on("chat-msg", (data: Message) => {
             callback(data);
         });
-
     };
-
 
     return (
         <SocketContext.Provider value={{
