@@ -19,10 +19,10 @@ Le client s'initialise avec l'URL définie dans `SOCKET_URL`.
 
 ```mermaid
 sequenceDiagram
-    participant UI as Component (Chat.tsx)
+    participant UI as "Component (Chat.tsx)"
     participant Context as SocketContext
-    participant Server as Socket.io Server
-    participant Clients as Other Clients
+    participant Server as "Socket.io Server"
+    participant Clients as "Other Clients"
     
     UI->>Context: sendMessage("Hello")
     Context->>Server: emit("chat-msg", { content: "Hello" })

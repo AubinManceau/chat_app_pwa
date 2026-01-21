@@ -16,12 +16,12 @@ L'application suit une architecture client-serveur avec une connexion WebSocket 
 
 ```mermaid
 graph TD
-    User[Client (Browser/PWA)]
-    Server[Next.js Server (Node.js)]
-    SocketServer[Socket.io Server]
+    User["Client (Browser/PWA)"]
+    Server["Next.js Server (Node.js)"]
+    SocketServer["Socket.io Server"]
     
-    User -- HTTP Request (Initial Load) --> Server
-    User -- WebSocket Connection (Events) --> SocketServer
+    User -- "HTTP Request (Initial Load)" --> Server
+    User -- "WebSocket Connection (Events)" --> SocketServer
     
     subgraph Client Application
         AuthContext[Auth Context]
@@ -30,8 +30,8 @@ graph TD
         ServiceWorker[Service Worker]
     end
     
-    SocketServer -- Broadcast Messages --> User
-    ServiceWorker -- Push Notifications --> User
+    SocketServer -- "Broadcast Messages" --> User
+    ServiceWorker -- "Push Notifications" --> User
 ```
 
 ## Structure du Projet
