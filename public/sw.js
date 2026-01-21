@@ -1,15 +1,12 @@
 self.addEventListener('install', (event) => {
-    console.log('Service Worker installing...');
     self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-    console.log('Service Worker activating...');
     event.waitUntil(clients.claim());
 });
 
 self.addEventListener('notificationclick', (event) => {
-    console.log('Notification clicked:', event);
     event.notification.close();
 
     event.waitUntil(
@@ -27,8 +24,6 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 self.addEventListener('push', (event) => {
-    console.log('Push event received:', event);
-
     if (event.data) {
         const data = event.data.json();
         const options = {
