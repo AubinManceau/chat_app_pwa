@@ -24,4 +24,5 @@ jobs:
             git pull origin master
             npm install
             npm run build
+            export PM2_HOME=/root/.pm2
             pm2 restart chat_app_pwa
