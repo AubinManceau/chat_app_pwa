@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { useSocket } from "@/contexts/SocketContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOfflineQueue } from "@/contexts/OfflineQueueContext";
-import { sendImage, getImage } from "@/lib/api";
+import { sendImage } from "@/lib/api";
 import { Message } from "@/types/chat";
 import MessageBubble from "@/components/chat/MessageBubble";
 import ImagePreview from "@/components/chat/ImagePreview";
@@ -22,7 +22,7 @@ export default function Chat() {
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const { pseudo } = useAuth();
     const socket = useSocket();
-    const { isConnected, queueMessage, getPendingMessages, flushRoomQueue, removeMessage } = useOfflineQueue();
+    const { isConnected, queueMessage, getPendingMessages, removeMessage } = useOfflineQueue();
 
 
     const sendMessage = () => {

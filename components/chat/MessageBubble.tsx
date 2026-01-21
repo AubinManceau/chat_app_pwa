@@ -113,12 +113,12 @@ export default function MessageBubble({ message, isOwnMessage, onImageClick, isP
                 )}
                 {isPending && (
                     <p className={`text-[10px] italic mt-1 ${isOwnMessage ? 'text-white/70' : 'text-gray-500'}`}>
-                        En attente d'envoi...
+                        En attente d&apos;envoi...
                     </p>
                 )}
                 {isFailed && (
                     <p className="text-[10px] italic mt-1 text-red-500">
-                        Échec de l'envoi
+                        Échec de l&apos;envoi
                     </p>
                 )}
             </div>
