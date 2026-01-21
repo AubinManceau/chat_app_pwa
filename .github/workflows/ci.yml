@@ -24,4 +24,4 @@ jobs:
             git pull origin master
             npm install
             npm run build
-            sudo pm2 restart chat_app_pwa
+            pm2 restart chat_app_pwa
